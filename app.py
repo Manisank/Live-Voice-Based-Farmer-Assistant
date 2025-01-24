@@ -1,38 +1,69 @@
 import streamlit as st
 import os
 import requests
-import speech_recognition as sr
+import tempfile
+import sounddevice as sd
+import wave
+import queue
+import time
 from google.cloud import texttospeech
 import json
-import os
+import speech_recognition as sr
 
-import os
-import streamlit as st
+# Apply Custom CSS
+def apply_custom_styles():
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #121212;
+            color: #FFFFFF;
+        }
+        .main-content {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #FFFFFF;
+        }
+        .stButton > button {
+            background-color: #FFFFFF;
+            color: #000000;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 8px 16px;
+        }
+        .stTextArea textarea {
+            background-color: #1E1E1E;
+            color: #FFFFFF;
+            border: 1px solid #FFFFFF;
+            border-radius: 8px;
+            padding: 5px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-# Check if running locally or in Streamlit Cloud
+# Google Cloud Credentials
 if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 elif "GOOGLE_APPLICATION_CREDENTIALS_JSON" in st.secrets:
-    # Write the Google API key JSON to a temporary file for use on Streamlit Cloud
     with open("google_api_key.json", "w") as f:
         f.write(st.secrets["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_api_key.json"
 else:
     raise ValueError("Google API credentials are missing. Set 'GOOGLE_APPLICATION_CREDENTIALS' or use Streamlit Secrets.")
 
-from dotenv import load_dotenv
-import os
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Access the Hugging Face token
-HUGGING_FACE_API_TOKEN = os.getenv("HUGGING_FACE_API_TOKEN")
+# Hugging Face Token and Endpoint
 HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
-
+HUGGING_FACE_API_TOKEN = os.getenv("HUGGING_FACE_API_TOKEN") or st.secrets.get("HUGGING_FACE_API_TOKEN")
+if not HUGGING_FACE_API_TOKEN:
+    st.error("Hugging Face API token is missing. Please set it in .env or Streamlit Secrets.")
+    raise ValueError("Hugging Face API token is required.")
 headers = {"Authorization": f"Bearer {HUGGING_FACE_API_TOKEN}"}
 
-# Load predefined responses from JSON file
+# Load predefined responses
 def load_predefined_responses(json_file="predefined_responses.json"):
     try:
         with open(json_file, "r") as file:
@@ -43,37 +74,82 @@ def load_predefined_responses(json_file="predefined_responses.json"):
 
 # Speech-to-Text Function
 def live_speech_to_text():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        st.info("Listening... Speak now!")
+    st.info("Listening... Speak now!")
+    audio_queue = queue.Queue()
+
+    def audio_callback(indata, frames, time, status):
+        if status:
+            st.error(f"SoundDevice error: {status}")
+        audio_queue.put(indata.copy())
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav_file:
         try:
-            audio = recognizer.listen(source, timeout=5)
-            st.success("Voice captured. Processing...")
-            text = recognizer.recognize_google(audio)
-            return text
+            with sd.InputStream(callback=audio_callback, channels=1, samplerate=16000, dtype="int16"):
+                st.info("Recording for 5 seconds...")
+                sd.sleep(5000)
+
+            with wave.open(tmp_wav_file.name, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(16000)
+                while not audio_queue.empty():
+                    wf.writeframes(audio_queue.get())
+
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(tmp_wav_file.name) as source:
+                audio_data = recognizer.record(source)
+                text = recognizer.recognize_google(audio_data)
+                return text
         except sr.UnknownValueError:
-            st.error("Sorry, I couldn't understand what you said. Please try again.")
+            st.error("Sorry, I couldn't understand what you said.")
             return None
         except sr.RequestError as e:
-            st.error(f"Could not request results from Google Speech Recognition service; {e}")
+            st.error(f"Error with Google Speech Recognition service: {e}")
             return None
+        except Exception as e:
+            st.error(f"Error during speech recognition: {e}")
+            return None
+        finally:
+            try:
+                tmp_wav_file.close()
+                os.remove(tmp_wav_file.name)
+            except Exception as delete_error:
+                st.warning(f"Error deleting temporary file: {delete_error}")
 
 # Text-to-Speech Function
+# Text-to-Speech Function
 def text_to_speech(text, output_file="output.mp3"):
-    client = texttospeech.TextToSpeechClient()
-    synthesis_input = texttospeech.SynthesisInput(text=text)
+    try:
+        client = texttospeech.TextToSpeechClient()
 
-    voice = texttospeech.VoiceSelectionParams(
-        language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
-    )
-    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+        # Split long text into manageable chunks for TTS
+        max_chunk_size = 500  # Google TTS character limit per request
+        chunks = [text[i:i + max_chunk_size] for i in range(0, len(text), max_chunk_size)]
+        audio_content = b""
 
-    response = client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+        for chunk in chunks:
+            synthesis_input = texttospeech.SynthesisInput(text=chunk)
+            voice = texttospeech.VoiceSelectionParams(
+                language_code="en-US",
+                ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
+            )
+            audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+            response = client.synthesize_speech(
+                input=synthesis_input, voice=voice, audio_config=audio_config
+            )
+            audio_content += response.audio_content
 
-    with open(output_file, "wb") as out:
-        out.write(response.audio_content)
-    return output_file
+        # Write the combined audio content to the output file
+        with open(output_file, "wb") as out:
+            out.write(audio_content)
+        return output_file
+    except Exception as e:
+        st.error(f"Text-to-Speech failed: {e}")
+        return None
 
+# Generate Response using Hugging Face
+# Generate Response using Hugging Face
+# Generate Response using Hugging Face
 # Generate Response using Hugging Face API
 def generate_response_falcon(query):
     prompt = f"Answer concisely about farming, agriculture, or food systems:\n\n{query}\n\nAnswer:"
@@ -89,61 +165,7 @@ def generate_response_falcon(query):
 
 # Check for predefined responses
 def get_predefined_response(query, predefined_responses):
-    query_lower = query.lower()
-    return predefined_responses.get(query_lower, None)
-
-# Apply custom styles and dark theme
-def apply_custom_styles():
-    st.markdown(
-        """
-        <style>
-        /* Dark theme background and text */
-        .stApp {
-            background-color: #121212;
-            color: #FFFFFF;
-        }
-        .main-content {
-            background: rgba(255, 255, 255, 0.1); /* Semi-transparent white */
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #FFFFFF;
-        }
-        .stButton>button {
-            background-color: #FFFFFF; /* White button */
-            color: #000000; /* Black text */
-            font-size: 18px;
-            font-weight: bold;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        .stButton>button:hover {
-            background-color: #EEEEEE; /* Lighter white */
-        }
-        h1, h2, h3 {
-            color: #FFFFFF !important;
-            text-shadow: 1px 1px 2px #000000;
-        }
-        .stTextArea textarea {
-            background-color: #1E1E1E; /* Dark gray */
-            color: #FFFFFF; /* White text */
-            border: 1px solid #FFFFFF;
-            border-radius: 8px;
-            padding: 5px;
-            font-size: 16px;
-        }
-        .stInfo {
-            background-color: rgba(255, 255, 255, 0.1);
-            color: #FFFFFF;
-            border: 1px solid #FFFFFF;
-            padding: 10px;
-            border-radius: 8px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    return predefined_responses.get(query.lower(), None)
 
 # Streamlit App
 def main():
@@ -152,14 +174,12 @@ def main():
     st.title("🌾 Live Voice-Based Farmer Assistant 🌾")
     st.write("🎤 Speak your question about farming, agriculture, or food systems, and hear a concise response!")
 
-    # Load predefined responses from JSON
     predefined_responses = load_predefined_responses()
 
     if st.button("Speak Now"):
         query = live_speech_to_text()
         if query:
             st.success(f"Recognized Query: {query}")
-            # Check predefined responses first
             response = get_predefined_response(query, predefined_responses)
             if response:
                 st.info("Using predefined response.")
@@ -169,13 +189,9 @@ def main():
 
             st.write("### Response:")
             st.text_area("", response, height=150)
-
-            # Convert the response to speech
-            try:
-                response_audio = text_to_speech(response)
-                st.audio(response_audio, format="audio/mp3")
-            except Exception as e:
-                st.error(f"Text-to-Speech failed: {e}")
+            tts_output = text_to_speech(response)
+            if tts_output:
+                st.audio(tts_output, format="audio/mp3")
     st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
