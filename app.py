@@ -58,35 +58,21 @@ def live_speech_to_text():
             st.error(f"Could not request results from Google Speech Recognition service; {e}")
             return None
 
-# Speech-to-Text Function using Google Speech-to-Text API
-def live_speech_to_text():
-    st.info("Listening... Speak now!")
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        try:
-            # Capture the voice input
-            audio = recognizer.listen(source, timeout=5)
-            st.success("Voice captured. Processing...")
-            # Use Google Cloud Speech-to-Text for transcription
-            client = speech.SpeechClient()
-            audio_config = speech.RecognitionAudio(content=audio.get_wav_data())
-            config = speech.RecognitionConfig(
-                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-                sample_rate_hertz=16000,
-                language_code="en-US",
-            )
-            response = client.recognize(config=config, audio=audio_config)
-            if response.results:
-                return response.results[0].alternatives[0].transcript
-            else:
-                st.error("No speech detected. Try again.")
-                return None
-        except sr.UnknownValueError:
-            st.error("Sorry, I couldn't understand what you said. Please try again.")
-            return None
-        except sr.RequestError as e:
-            st.error(f"Error with the Speech-to-Text API: {e}")
-            return None
+# Text-to-Speech Function
+def text_to_speech(text, output_file="output.mp3"):
+    client = texttospeech.TextToSpeechClient()
+    synthesis_input = texttospeech.SynthesisInput(text=text)
+
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
+    )
+    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+
+    response = client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+
+    with open(output_file, "wb") as out:
+        out.write(response.audio_content)
+    return output_file
 
 # Generate Response using Hugging Face API
 def generate_response_falcon(query):
