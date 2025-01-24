@@ -1,0 +1,4 @@
+# Ignore environment and secret files
+.env
+.streamlit/secrets.toml
+google_api_key.json
