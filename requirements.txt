@@ -1,12 +1,43 @@
-streamlit==1.25.0
+# Core Dependencies
+streamlit==1.41.1
+streamlit-webrtc==0.47.9
+
+# Google Cloud APIs
+google-api-core==2.24.0
+google-auth==2.38.0
+google-cloud-speech==2.30.0
 google-cloud-texttospeech==2.24.0
-sounddevice==0.4.6
-setuptools>=66.1.1
-wheel>=0.41.2
-pip>=24.3.1
+googleapis-common-protos==1.66.0
+grpcio==1.69.0
+grpcio-status==1.69.0
+
+# Hugging Face Integration
 requests==2.31.0
-speechrecognition==3.8.1
-pillow<10,>=9.5.0
-numpy==1.25.0
-protobuf==3.20.*
+
+# Audio Processing
+sounddevice==0.4.6
+
+# Data Handling
+pandas==2.2.3
+numpy==2.2.2
+
+# JSON Parsing and Utilities
 python-dotenv==1.0.0
+jsonschema==4.23.0
+attrs==24.3.0
+
+# Miscellaneous
+altair==5.5.0
+protobuf==5.29.3
+markdown-it-py==3.0.0
+pytz==2024.2
+
+# Visualization
+pydeck==0.9.1
+rich==13.9.4
+
+# Dependencies Removed:
+# - PyAudio: Not supported on Streamlit Cloud.
+# - Pillow (version conflict with Streamlit dependencies).
+# - aiortc and related dependencies: Unused for this project.
+# - gitdb, GitPython: Unused for your current workflow.
