@@ -36,8 +36,6 @@ pytz==2024.2
 pydeck==0.9.1
 rich==13.9.4
 
-# Dependencies Removed:
-# - PyAudio: Not supported on Streamlit Cloud.
-# - Pillow (version conflict with Streamlit dependencies).
-# - aiortc and related dependencies: Unused for this project.
-# - gitdb, GitPython: Unused for your current workflow.
+# Additional Requirements for Compatibility
+six>=1.17.0
+tenacity==9.0.0
