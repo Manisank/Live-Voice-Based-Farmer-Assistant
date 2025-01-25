@@ -90,6 +90,8 @@ def text_to_speech(text):
         audio_file.write(response.audio_content)
         return audio_file.name
 
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, ClientSettings
+
 # Main Streamlit App
 def main():
     st.title("🌾 Live Voice-Based Farmer Assistant 🌾")
@@ -98,7 +100,7 @@ def main():
     # WebRTC Audio Streaming
     ctx = webrtc_streamer(
         key="speech-to-text",
-        mode="sendrecv",
+        mode=ClientSettings.Mode.SENDRECV,  # Use the correct enumeration here
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         audio_processor_factory=AudioProcessor,
         media_stream_constraints={"audio": True, "video": False},
@@ -107,16 +109,8 @@ def main():
     if ctx and ctx.audio_processor:
         audio_data = ctx.audio_processor.get_audio_data()
         if len(audio_data) > 0:
-            # Convert audio to text
-            transcript = process_audio_to_text(audio_data, sample_rate=16000)
-            if transcript:
-                st.success(f"Recognized Query: {transcript}")
-                # Generate response
-                response = generate_response_from_huggingface(transcript)
-                st.text_area("Response:", response, height=150)
-                # Convert response to speech
-                audio_file = text_to_speech(response)
-                st.audio(audio_file, format="audio/mp3")
+            # Add processing logic here (e.g., speech-to-text and response generation)
+            pass
 
 
 if __name__ == "__main__":
