@@ -1,8 +1,41 @@
+# Core Dependencies
 streamlit==1.41.1
-streamlit-webrtc==0.47.3
+streamlit-webrtc==0.47.9
+
+# Google Cloud APIs
+google-api-core==2.24.0
+google-auth==2.38.0
 google-cloud-speech==2.30.0
 google-cloud-texttospeech==2.24.0
+googleapis-common-protos==1.66.0
+grpcio==1.69.0
+grpcio-status==1.69.0
+
+# Hugging Face Integration
 requests==2.31.0
-pandas==1.5.3
-numpy==1.23.5
+
+# Audio Processing
+sounddevice==0.4.6
+
+# Data Handling
+pandas==2.2.3
+numpy==1.24.3  # Compatible version for TensorFlow and dependencies.
+
+# JSON Parsing and Utilities
 python-dotenv==1.0.0
+jsonschema==4.23.0
+attrs==24.3.0
+
+# Miscellaneous
+altair==5.5.0
+protobuf==5.29.3
+markdown-it-py==3.0.0
+pytz==2024.2
+
+# Visualization
+pydeck==0.9.1
+rich==13.9.4
+
+# Compatibility Requirements
+six>=1.17.0
+tenacity==9.0.0
