@@ -17,25 +17,6 @@ requests==2.31.0
 # Audio Processing
 sounddevice==0.4.6
 
-# Data Handling
-pandas==2.2.3
-numpy==2.2.2
-
-# JSON Parsing and Utilities
-python-dotenv==1.0.0
-jsonschema==4.23.0
-attrs==24.3.0
-
 # Miscellaneous
-altair==5.5.0
-protobuf==5.29.3
-markdown-it-py==3.0.0
-pytz==2024.2
 tenacity==9.0.0
-
-# Visualization
-pydeck==0.9.1
-rich==13.9.4
-
-# Additional Compatibility Dependencies
-six>=1.17.0
+protobuf==5.29.3
