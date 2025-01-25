@@ -116,6 +116,6 @@ if __name__ == "__main__":
     port = os.environ.get("PORT", 8501)  # Default to 8501 if PORT is not set
     # Start the Streamlit app on the specified port
     os.system(f"streamlit run app.py --server.port {port} --server.address 0.0.0.0")
-     main()
+    main()
 
 
