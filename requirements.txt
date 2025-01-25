@@ -7,16 +7,15 @@ google-api-core==2.24.0
 google-auth==2.38.0
 google-cloud-speech==2.30.0
 google-cloud-texttospeech==2.24.0
-googleapis-common-protos==1.66.0
 grpcio==1.69.0
-grpcio-status==1.69.0
 
 # Hugging Face Integration
 requests==2.31.0
 
 # Audio Processing
-sounddevice==0.4.6
+numpy==2.2.2
 
 # Miscellaneous
-tenacity==9.0.0
-protobuf==5.29.3
+python-dotenv==1.0.0
+jsonschema==4.23.0
+pandas==2.2.3
