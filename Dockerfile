@@ -1,32 +1,29 @@
-# Use the official Python 3.12 image
+# Use an official Python runtime as the base image
 FROM python:3.12-slim
 
-# Set the working directory in the container
-WORKDIR /app
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Copy the application files to the container
-COPY . .
+# Set the working directory
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    libasound2-dev \
-    libportaudio2 \
-    libportaudiocpp0 \
     portaudio19-dev \
-    python3-distutils \
-    python3-apt \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install necessary tools
-RUN python3 -m ensurepip --upgrade
-RUN pip install --upgrade pip setuptools==65.5.1 wheel
+# Copy requirements.txt and install Python dependencies
+COPY requirements.txt .
+RUN python3 -m ensurepip --upgrade && \
+    pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt
 
-# Install project dependencies
-RUN pip install -r requirements.txt
+# Copy the app code into the container
+COPY . .
 
 # Expose the port Streamlit will use
 EXPOSE 8501
 
-# Command to run the application
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.enableCORS=false"]
+# Run the Streamlit app
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
