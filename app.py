@@ -1,124 +1,184 @@
-import os
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
-import numpy as np
-import wave
-import tempfile
+import os
 import requests
+import tempfile
+import sounddevice as sd
+import wave
+import queue
 from google.cloud import texttospeech
 import json
+import speech_recognition as sr
 
-# Load Google Cloud and Hugging Face Configurations
+# Apply Custom CSS
+def apply_custom_styles():
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #121212;
+            color: #FFFFFF;
+        }
+        .main-content {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #FFFFFF;
+        }
+        .stButton > button {
+            background-color: #FFFFFF;
+            color: #000000;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 8px 16px;
+        }
+        .stTextArea textarea {
+            background-color: #1E1E1E;
+            color: #FFFFFF;
+            border: 1px solid #FFFFFF;
+            border-radius: 8px;
+            padding: 5px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# Load Google Cloud Credentials from Environment Variable
 GOOGLE_APPLICATION_CREDENTIALS_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-HUGGING_FACE_API_TOKEN = os.getenv("HUGGING_FACE_API_TOKEN")
-
 if GOOGLE_APPLICATION_CREDENTIALS_JSON:
     with open("google_api_key.json", "w") as f:
         f.write(GOOGLE_APPLICATION_CREDENTIALS_JSON)
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_api_key.json"
-    st.write("✅ Google API credentials loaded.")
 else:
-    st.error("❌ Google API credentials not found! Please set the environment variable `GOOGLE_APPLICATION_CREDENTIALS_JSON`.")
+    st.error("Google API credentials not found! Please set GOOGLE_APPLICATION_CREDENTIALS_JSON in your environment variables.")
 
+# Load Hugging Face Token from Environment Variable
+HUGGING_FACE_API_TOKEN = os.getenv("HUGGING_FACE_API_TOKEN")
 if not HUGGING_FACE_API_TOKEN:
-    st.error("❌ Hugging Face API token not found! Please set the environment variable `HUGGING_FACE_API_TOKEN`.")
-else:
-    HEADERS = {"Authorization": f"Bearer {HUGGING_FACE_API_TOKEN}"}
+    st.error("Hugging Face API token not found! Please set HUGGING_FACE_API_TOKEN in your environment variables.")
 
 HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
+headers = {"Authorization": f"Bearer {HUGGING_FACE_API_TOKEN}"}
 
-# Example Usage of Configurations (for testing or further logic)
-#st.write("Google Cloud and Hugging Face Configurations are set up.")
+# Load Predefined Responses
+def load_predefined_responses(json_file="predefined_responses.json"):
+    try:
+        with open(json_file, "r") as file:
+            return json.load(file)
+    except Exception as e:
+        st.error(f"Failed to load predefined responses: {e}")
+        return {}
 
+# Speech-to-Text Function
+def live_speech_to_text():
+    st.info("Listening... Speak now!")
+    audio_queue = queue.Queue()
 
-# Audio Processor for Streamlit WebRTC
-class AudioProcessor(AudioProcessorBase):
-    def __init__(self):
-        self.audio_data = np.zeros((0,), dtype=np.float32)
+    def audio_callback(indata, frames, time, status):
+        if status:
+            st.error(f"SoundDevice error: {status}")
+        audio_queue.put(indata.copy())
 
-    def recv_audio(self, frames: np.ndarray):
-        self.audio_data = np.append(self.audio_data, frames)
-        return frames
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav_file:
+        try:
+            with sd.InputStream(callback=audio_callback, channels=1, samplerate=16000, dtype="int16"):
+                st.info("Recording for 5 seconds...")
+                sd.sleep(5000)
 
-    def get_audio_data(self):
-        return self.audio_data
+            with wave.open(tmp_wav_file.name, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(16000)
+                while not audio_queue.empty():
+                    wf.writeframes(audio_queue.get())
 
-# Helper Functions
-def process_audio_to_text(audio_data, sample_rate):
-    """Convert recorded audio to text using Google Speech API."""
-    st.info("Processing audio into text...")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-        with wave.open(temp_audio.name, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(sample_rate)
-            wf.writeframes((audio_data * 32767).astype(np.int16).tobytes())
-        temp_audio.seek(0)
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(tmp_wav_file.name) as source:
+                audio_data = recognizer.record(source)
+                text = recognizer.recognize_google(audio_data)
+                return text
+        except sr.UnknownValueError:
+            st.error("Sorry, I couldn't understand what you said.")
+            return None
+        except sr.RequestError as e:
+            st.error(f"Error with Google Speech Recognition service: {e}")
+            return None
+        except Exception as e:
+            st.error(f"Error during speech recognition: {e}")
+            return None
+        finally:
+            try:
+                tmp_wav_file.close()
+                os.remove(tmp_wav_file.name)
+            except Exception as delete_error:
+                st.warning(f"Error deleting temporary file: {delete_error}")
 
-        # Use Google Cloud Speech-to-Text
-        from google.cloud import speech_v1p1beta1 as speech
+# Text-to-Speech Function
+def text_to_speech(text, output_file="output.mp3"):
+    try:
+        client = texttospeech.TextToSpeechClient()
 
-        client = speech.SpeechClient()
-        with open(temp_audio.name, "rb") as audio_file:
-            content = audio_file.read()
-        audio = speech.RecognitionAudio(content=content)
-        config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=sample_rate,
-            language_code="en-US",
-        )
-        response = client.recognize(config=config, audio=audio)
-        for result in response.results:
-            return result.alternatives[0].transcript
-    return None
+        # Split long text into manageable chunks for TTS
+        max_chunk_size = 500
+        chunks = [text[i:i + max_chunk_size] for i in range(0, len(text), max_chunk_size)]
+        audio_content = b""
 
-def generate_response_from_huggingface(query):
-    """Generate a response using Hugging Face LLM."""
-    st.info("Generating response...")
+        for chunk in chunks:
+            synthesis_input = texttospeech.SynthesisInput(text=chunk)
+            voice = texttospeech.VoiceSelectionParams(
+                language_code="en-US",
+                ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
+            )
+            audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+            response = client.synthesize_speech(
+                input=synthesis_input, voice=voice, audio_config=audio_config
+            )
+            audio_content += response.audio_content
+
+        # Write the combined audio content to the output file
+        with open(output_file, "wb") as out:
+            out.write(audio_content)
+        return output_file
+    except Exception as e:
+        st.error(f"Text-to-Speech failed: {e}")
+        return None
+
+# Generate Response using Hugging Face
+def generate_response_falcon(query):
     payload = {"inputs": query, "parameters": {"max_new_tokens": 150}}
-    response = requests.post(HUGGING_FACE_API_URL, headers=HEADERS, json=payload)
+    response = requests.post(HUGGING_FACE_API_URL, headers=headers, json=payload)
     if response.status_code == 200:
-        return response.json()[0]["generated_text"].strip()
+        raw_response = response.json()[0]["generated_text"]
+        return raw_response.strip()
     else:
-        st.error(f"Hugging Face API error: {response.status_code}")
+        st.error(f"Error with Hugging Face API: {response.status_code}")
         return "I'm sorry, I couldn't generate a response."
 
-def text_to_speech(text):
-    """Convert text to speech using Google Text-to-Speech."""
-    st.info("Converting text to speech...")
-    client = texttospeech.TextToSpeechClient()
-    synthesis_input = texttospeech.SynthesisInput(text=text)
-    voice = texttospeech.VoiceSelectionParams(
-        language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
-    )
-    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
-    response = client.synthesize_speech(
-        input=synthesis_input, voice=voice, audio_config=audio_config
-    )
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as audio_file:
-        audio_file.write(response.audio_content)
-        return audio_file.name
-
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
-
-# Main Streamlit App
+# Streamlit App
 def main():
+    apply_custom_styles()
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
     st.title("🌾 Live Voice-Based Farmer Assistant 🌾")
-    st.write("🎤 Speak your question about farming, agriculture, or food systems, and get a concise response!")
+    st.write("🎤 Speak your question about farming, agriculture, or food systems, and hear a concise response!")
 
-    # WebRTC Audio Streaming
-    ctx = webrtc_streamer(
-        key="speech-to-text",
-        mode="sendrecv",  # Directly use the string "sendrecv"
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-        audio_processor_factory=None,  # Replace with your AudioProcessor class if needed
-        media_stream_constraints={"audio": True, "video": False},
-    )
+    predefined_responses = load_predefined_responses()
 
-    if ctx and ctx.state.playing:
-        st.info("Listening for your voice...")
-        # Handle additional processing logic here
-   
+    if st.button("Speak Now"):
+        query = live_speech_to_text()
+        if query:
+            st.success(f"Recognized Query: {query}")
+            response = predefined_responses.get(query.lower(), None)
+            if not response:
+                response = generate_response_falcon(query)
+
+            st.write("### Response:")
+            st.text_area("", response, height=150)
+            tts_output = text_to_speech(response)
+            if tts_output:
+                st.audio(tts_output, format="audio/mp3")
+    st.markdown('</div>', unsafe_allow_html=True)
+
 if __name__ == "__main__":
     import os
     # Get the port from the environment (for platforms like Render or Heroku)
