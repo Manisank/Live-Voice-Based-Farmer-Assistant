@@ -57,14 +57,15 @@ def generate_response_falcon(query):
     else:
         return "Sorry, I couldn't generate a response. Please try again."
 
-# WebRTC Audio Processor
-class AudioProcessor(AudioProcessorBase):
-    def __init__(self):
-        self.frames = queue.Queue()
+# Updated WebRTC Config
+ctx = webrtc_streamer(
+    key="speech-to-text",
+    mode="SENDRECV",  # Use string instead of ClientSettings.Mode.SENDRECV
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+    audio_processor_factory=AudioProcessor,
+    media_stream_constraints={"audio": True, "video": False},
+)
 
-    def recv(self, frame):
-        self.frames.put(frame.to_ndarray())
-        return frame
 
 def main():
     apply_custom_styles()
