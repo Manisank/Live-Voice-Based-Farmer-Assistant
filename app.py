@@ -109,8 +109,13 @@ def main():
     if ctx and ctx.state.playing:
         st.info("Listening for your voice...")
         # Handle additional processing logic here
-
-
+   
 if __name__ == "__main__":
-    main()
+    import os
+    # Get the port from the environment (for platforms like Render or Heroku)
+    port = os.environ.get("PORT", 8501)  # Default to 8501 if PORT is not set
+    # Start the Streamlit app on the specified port
+    os.system(f"streamlit run app.py --server.port {port} --server.address 0.0.0.0")
+     main()
+
 
