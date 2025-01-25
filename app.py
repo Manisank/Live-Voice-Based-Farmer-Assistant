@@ -86,6 +86,7 @@ def live_speech_to_text():
                 st.info("Recording for 5 seconds...")
                 sd.sleep(5000)
 
+            # Save audio data to a file
             with wave.open(tmp_wav_file.name, "wb") as wf:
                 wf.setnchannels(1)
                 wf.setsampwidth(2)
@@ -93,13 +94,17 @@ def live_speech_to_text():
                 while not audio_queue.empty():
                     wf.writeframes(audio_queue.get())
 
+            # Debug: Log the recorded audio file path
+            st.write(f"Recorded audio saved to {tmp_wav_file.name}")
+
+            # Speech recognition
             recognizer = sr.Recognizer()
             with sr.AudioFile(tmp_wav_file.name) as source:
                 audio_data = recognizer.record(source)
                 text = recognizer.recognize_google(audio_data)
                 return text
         except sr.UnknownValueError:
-            st.error("Sorry, I couldn't understand what you said.")
+            st.error("Google Speech Recognition could not understand the audio.")
             return None
         except sr.RequestError as e:
             st.error(f"Error with Google Speech Recognition service: {e}")
