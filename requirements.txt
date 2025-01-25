@@ -31,11 +31,11 @@ altair==5.5.0
 protobuf==5.29.3
 markdown-it-py==3.0.0
 pytz==2024.2
+tenacity==9.0.0
 
 # Visualization
 pydeck==0.9.1
 rich==13.9.4
 
-# Additional Requirements for Compatibility
+# Additional Compatibility Dependencies
 six>=1.17.0
-tenacity==9.0.0
