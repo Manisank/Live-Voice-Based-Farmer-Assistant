@@ -1,21 +1,21 @@
 # Core Dependencies
 streamlit==1.41.1
-streamlit-webrtc==0.47.9
+streamlit-webrtc==0.47.3  # Ensure compatibility with `mode="sendrecv"`
 
 # Google Cloud APIs
 google-api-core==2.24.0
 google-auth==2.38.0
 google-cloud-speech==2.30.0
 google-cloud-texttospeech==2.24.0
-grpcio==1.69.0
+grpcio==1.49.0  # Compatible with Streamlit Cloud
 
 # Hugging Face Integration
 requests==2.31.0
 
 # Audio Processing
-numpy==2.2.2
+numpy==1.24.3
 
 # Miscellaneous
 python-dotenv==1.0.0
 jsonschema==4.23.0
-pandas==2.2.3
+pandas==1.5.3
