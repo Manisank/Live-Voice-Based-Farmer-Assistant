@@ -65,11 +65,25 @@ def text_to_speech(text):
     with open("output.mp3", "wb") as out:
         out.write(response.audio_content)
     return "output.mp3"
+from streamlit_webrtc import webrtc_streamer, RTCConfiguration
 
-# WebRTC audio processing
-class AudioProcessor(AudioProcessorBase):
-    def recv_audio(self, frames):
-        return frames
+# Configure STUN Server
+RTC_CONFIGURATION = RTCConfiguration(
+    {
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]}  # Google's free STUN server
+        ]
+    }
+)
+
+# Inside your main function or WebRTC section
+ctx = webrtc_streamer(
+    key="live-voice",
+    rtc_configuration=RTC_CONFIGURATION,
+    media_stream_constraints={"audio": True, "video": False},  # Only audio
+    async_processing=True,
+)
+
 
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
