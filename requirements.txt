@@ -20,6 +20,7 @@ sounddevice==0.4.6
 # Data Handling
 pandas==2.2.3
 numpy==2.2.2
+SpeechRecognition==3.8.1
 
 # JSON Parsing and Utilities
 python-dotenv==1.0.0
