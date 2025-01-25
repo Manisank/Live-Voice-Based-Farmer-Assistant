@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy the application files to the container
 COPY . .
 
-# Install system dependencies and python3-distutils
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     libasound2-dev \
@@ -18,9 +18,11 @@ RUN apt-get update && apt-get install -y \
     python3-apt \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install dependencies
+# Upgrade pip and install necessary tools
 RUN python3 -m ensurepip --upgrade
-RUN pip install --upgrade pip setuptools wheel
+RUN pip install --upgrade pip setuptools==65.5.1 wheel
+
+# Install project dependencies
 RUN pip install -r requirements.txt
 
 # Expose the port Streamlit will use
