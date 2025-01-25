@@ -71,34 +71,23 @@ class AudioProcessor(AudioProcessorBase):
     def recv_audio(self, frames):
         return frames
 
-# Main Streamlit app
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
+
 def main():
-    apply_custom_styles()
     st.title("🌾 Live Voice-Based Farmer Assistant 🌾")
     st.write("🎤 Speak your question about farming, agriculture, or food systems, and hear a concise response!")
 
     ctx = webrtc_streamer(
-        key="speech-to-text",
-        mode=ClientSettings.Mode.SENDRECV,
-        audio_processor_factory=AudioProcessor,
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        key="example",
+        mode=WebRtcMode.SENDRECV,  # Correct usage of WebRtcMode
         media_stream_constraints={"audio": True, "video": False},
     )
 
-    if ctx.audio_receiver:
-        audio_frames = ctx.audio_receiver.get_frames(timeout=1)
-        st.info("Processing audio input...")
-
-        # Placeholder: Integrate speech-to-text API here
-        query = "What is drip irrigation?"  # Replace this with actual transcription logic
-        st.success(f"Recognized Query: {query}")
-
-        response = generate_response_falcon(query)
-        st.write("### Response:")
-        st.text_area("", response, height=150)
-
-        audio_file = text_to_speech(response)
-        st.audio(audio_file, format="audio/mp3")
+    if ctx.audio_receiver and st.button("Process Audio"):
+        audio_frames = ctx.audio_receiver.get_frames()
+        for frame in audio_frames:
+            # Process the audio frames here
+            st.write("Audio received and processed!")
 
 if __name__ == "__main__":
     main()
