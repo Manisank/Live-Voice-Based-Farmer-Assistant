@@ -114,8 +114,8 @@ def generate_response_falcon(query):
     else:
         st.error(f"Error with Hugging Face API: {response.status_code}")
         return "I'm sorry, I couldn't generate a response. Please try again."
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, ClientSettings
 
-# Streamlit App
 def main():
     apply_custom_styles()
     st.title("🌾 Live Voice-Based Farmer Assistant 🌾")
@@ -123,13 +123,13 @@ def main():
 
     ctx = webrtc_streamer(
         key="speech-to-text",
-        mode="SENDRECV",
+        mode=ClientSettings.Mode.SENDRECV,  # Correctly using the enumeration
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         audio_processor_factory=AudioProcessor,
         media_stream_constraints={"audio": True, "video": False},
     )
 
-    if ctx.audio_processor:
+    if ctx and ctx.audio_processor:
         audio_data, sample_rate = ctx.audio_processor.get_audio_data()
         if audio_data:
             st.info("Processing audio...")
@@ -142,6 +142,7 @@ def main():
                 tts_output = text_to_speech(response)
                 if tts_output:
                     st.audio(tts_output, format="audio/mp3")
+
 
 if __name__ == "__main__":
     main()
