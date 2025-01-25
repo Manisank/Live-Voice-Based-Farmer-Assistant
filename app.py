@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
 import numpy as np
@@ -7,20 +8,28 @@ import requests
 from google.cloud import texttospeech
 import json
 
-# Google Cloud and Hugging Face Configurations
-if "GOOGLE_APPLICATION_CREDENTIALS_JSON" in st.secrets:
-    with open("google_api_key.json", "w") as f:
-        f.write(st.secrets["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
-    st.write("Google API credentials loaded.")
-else:
-    st.error("Google API credentials not found! Please add them to Streamlit Secrets.")
+# Load Google Cloud and Hugging Face Configurations
+GOOGLE_APPLICATION_CREDENTIALS_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+HUGGING_FACE_API_TOKEN = os.getenv("HUGGING_FACE_API_TOKEN")
 
-HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
-HUGGING_FACE_API_TOKEN = st.secrets.get("HUGGING_FACE_API_TOKEN")
-HEADERS = {"Authorization": f"Bearer {HUGGING_FACE_API_TOKEN}"}
+if GOOGLE_APPLICATION_CREDENTIALS_JSON:
+    with open("google_api_key.json", "w") as f:
+        f.write(GOOGLE_APPLICATION_CREDENTIALS_JSON)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_api_key.json"
+    st.write("✅ Google API credentials loaded.")
+else:
+    st.error("❌ Google API credentials not found! Please set the environment variable `GOOGLE_APPLICATION_CREDENTIALS_JSON`.")
 
 if not HUGGING_FACE_API_TOKEN:
-    st.error("Hugging Face API token not found! Please add it to Streamlit Secrets.")
+    st.error("❌ Hugging Face API token not found! Please set the environment variable `HUGGING_FACE_API_TOKEN`.")
+else:
+    HEADERS = {"Authorization": f"Bearer {HUGGING_FACE_API_TOKEN}"}
+
+HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
+
+# Example Usage of Configurations (for testing or further logic)
+#st.write("Google Cloud and Hugging Face Configurations are set up.")
+
 
 # Audio Processor for Streamlit WebRTC
 class AudioProcessor(AudioProcessorBase):
